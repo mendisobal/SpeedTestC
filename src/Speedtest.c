@@ -45,6 +45,52 @@ float getElapsedTime(struct timeval tval_start) {
     return (float)tval_diff.tv_sec + (float)tval_diff.tv_usec / 1000000;
 }
 
+
+void print_Server_list(unsigned short *end_of_game)
+{
+
+    speedTestConfig = getConfig();
+    if (speedTestConfig == NULL)
+    {
+        printf("Cannot download speedtest.net configuration. Something is wrong...\n");
+        freeMem();
+        exit(1);
+    }
+    printf("Your IP: %s And ISP: %s\n",
+                speedTestConfig->ip, speedTestConfig->isp);
+    printf("Lat: %f Lon: %f\n", speedTestConfig->lat, speedTestConfig->lon);
+
+    serverList = getServers(&serverCount, URL_PROTOCOL "://www.speedtest.net/speedtest-servers-static.php");
+    if (serverCount == 0)
+    {
+        // Primary server is not responding. Let's give a try with secondary one.
+        serverList = getServers(&serverCount, URL_PROTOCOL "://c.speedtest.net/speedtest-servers-static.php");
+    }
+
+    if (serverCount == 0)
+    {
+        printf("Cannot download any speedtest.net server. Something is wrong...\n");
+        freeMem();
+        exit(1);
+    }
+    for(i=0; i<serverCount; i++)
+    {
+        printf("url: %s name: %s country: %s \n", serverList[i]->url, serverList[i]->name, serverList[i]->country);
+        // printf("Lat: %f Lon: %f\n", serverList[i]->lat, serverList[i]->lon);
+    }
+
+    for(i=0; i<serverCount; i++){
+        free(serverList[i]->url);
+        free(serverList[i]->name);
+        free(serverList[i]->sponsor);
+        free(serverList[i]->country);
+        free(serverList[i]);
+    }
+    printf("Grabbed %d servers\n", serverCount);
+    *end_of_game = 1;
+}
+
+
 void parseCmdLine(int argc, char **argv) {
     int i;
     for(i=1; i<argc; i++)
@@ -58,6 +104,7 @@ void parseCmdLine(int argc, char **argv) {
             \t--downtimes TIMES - how many times repeat download test.\n\
             \tSingle download test is downloading 30MB file.\n\
             \t--randomize NUMBER - randomize server usage for NUMBER of best servers\n\
+            \t--list prints a list of available servers\n\
             \nDefault action: Get server from Speedtest.NET infrastructure\n\
             and test download with 30MB download size and 1MB upload size.\n");
             exit(1);
@@ -78,6 +125,10 @@ void parseCmdLine(int argc, char **argv) {
         if(strcmp("--randomize", argv[i]) == 0)
         {
             randomizeBestServers = strtoul(argv[i + 1], NULL, 10);
+        }
+        if(strcmp("--list", argv[i]) == 0)
+        {
+            print_Server_list(&end_of_game);
         }
     }
 }
@@ -148,6 +199,9 @@ void getBestServer()
     }
 }
 
+
+
+
 static void getUserDefinedServer()
 {
     /* When user specify server URL, then we're not downloading config,
@@ -167,25 +221,31 @@ static void getUserDefinedServer()
 int main(int argc, char **argv)
 {
   totalTransfered = 1024 * 1024;
-  totalToBeTransfered = 1024 * 1024;
+  totalToBeTransfered = 1024 * 1024 * 30;
   totalDownloadTestCount = 1;
   randomizeBestServers = 0;
   speedTestConfig = NULL;
-  parseCmdLine(argc, argv);
+
 
 #ifdef OPENSSL
   SSL_library_init();
   SSL_load_error_strings();
   OpenSSL_add_all_algorithms();
 #endif
+  end_of_game = 0;
+  parseCmdLine(argc, argv);
 
+  if(end_of_game)
+  {
+    return 0;
+  }
   if(downloadUrl == NULL)
   {
       getBestServer();
   }
   else
   {
-      getUserDefinedServer();
+    getUserDefinedServer();
   }
 
   latencyUrl = getLatencyUrl(uploadUrl);

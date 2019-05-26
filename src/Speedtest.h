@@ -21,6 +21,7 @@ unsigned long totalToBeTransfered;
 struct timeval tval_start;
 float elapsedSecs;
 int randomizeBestServers;
+unsigned short end_of_game;
 typedef struct thread_args {
   pthread_t tid;
   char *url;
